@@ -7,8 +7,12 @@ import TimezoneSelect from "react-timezone-select";
 
 import { asStringOrNull, asStringOrUndefined } from "@lib/asStringOrNull";
 import { getSession } from "@lib/auth";
-import { extractLocaleInfo, localeLabels, localeOptions, OptionType } from "@lib/core/i18n/i18n.utils";
-import { useLocale } from "@lib/hooks/useLocale";
+import {
+  getOrSetUserLocaleFromHeaders,
+  localeLabels,
+  localeOptions,
+  OptionType,
+} from "@lib/core/i18n/i18n.utils";
 import { isBrandingHidden } from "@lib/isBrandingHidden";
 import prisma from "@lib/prisma";
 import { trpc } from "@lib/trpc";
@@ -87,7 +91,6 @@ function HideBrandingInput(props: {
 }
 
 export default function Settings(props: Props) {
-  const { locale } = useLocale({ localeProp: props.localeProp });
   const mutation = trpc.useMutation("viewer.updateProfile");
 
   const [successModalOpen, setSuccessModalOpen] = useState(false);
@@ -96,14 +99,19 @@ export default function Settings(props: Props) {
   const descriptionRef = useRef<HTMLTextAreaElement>();
   const avatarRef = useRef<HTMLInputElement>(null);
   const hideBrandingRef = useRef<HTMLInputElement>(null);
-  const [selectedTheme, setSelectedTheme] = useState({ value: props.user.theme });
-  const [selectedTimeZone, setSelectedTimeZone] = useState({ value: props.user.timeZone });
-  const [selectedWeekStartDay, setSelectedWeekStartDay] = useState({ value: props.user.weekStart });
-  const [selectedLanguage, setSelectedLanguage] = useState<OptionType>({
-    value: locale,
-    label: props.localeLabels[locale],
+  const [selectedTheme, setSelectedTheme] = useState<null | { value: string | null }>({
+    value: props.user.theme,
   });
-  const [imageSrc, setImageSrc] = useState<string>(props.user.avatar);
+  const [selectedTimeZone, setSelectedTimeZone] = useState({ value: props.user.timeZone });
+  const [selectedWeekStartDay, setSelectedWeekStartDay] = useState({
+    value: props.user.weekStart,
+    label: "",
+  });
+  const [selectedLanguage, setSelectedLanguage] = useState<OptionType>({
+    value: props.localeProp,
+    label: props.localeLabels[props.localeProp],
+  });
+  const [imageSrc, setImageSrc] = useState<string>(props.user.avatar || "");
   const [hasErrors, setHasErrors] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -112,7 +120,7 @@ export default function Settings(props: Props) {
       props.user.theme ? themeOptions.find((theme) => theme.value === props.user.theme) : null
     );
     setSelectedWeekStartDay({ value: props.user.weekStart, label: props.user.weekStart });
-    setSelectedLanguage({ value: locale, label: props.localeLabels[locale] });
+    setSelectedLanguage({ value: props.localeProp, label: props.localeLabels[props.localeProp] });
   }, []);
 
   const closeSuccessModal = () => {
@@ -271,7 +279,7 @@ export default function Settings(props: Props) {
                   <div className="mt-1">
                     <Select
                       id="languageSelect"
-                      value={selectedLanguage || locale}
+                      value={selectedLanguage || props.localeProp}
                       onChange={setSelectedLanguage}
                       classNamePrefix="react-select"
                       className="react-select-container border border-gray-300 rounded-sm shadow-sm focus:ring-neutral-500 focus:border-neutral-500 mt-1 block w-full sm:text-sm"
@@ -322,7 +330,7 @@ export default function Settings(props: Props) {
                       defaultValue={selectedTheme || themeOptions[0]}
                       value={selectedTheme || themeOptions[0]}
                       onChange={setSelectedTheme}
-                      className="shadow-sm focus:ring-neutral-500 focus:border-neutral-500 mt-1 block w-full sm:text-sm border-gray-300 rounded-sm"
+                      className="shadow-sm | { value: string } focus:ring-neutral-500 focus:border-neutral-500 mt-1 block w-full sm:text-sm border-gray-300 rounded-sm"
                       options={themeOptions}
                     />
                   </div>
@@ -416,7 +424,7 @@ export default function Settings(props: Props) {
 
 export const getServerSideProps = async (context: GetServerSidePropsContext) => {
   const session = await getSession(context);
-  const locale = await extractLocaleInfo(context.req);
+  const locale = await getOrSetUserLocaleFromHeaders(context.req);
 
   if (!session?.user?.id) {
     return { redirect: { permanent: false, destination: "/auth/login" } };
