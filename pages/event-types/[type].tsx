@@ -19,7 +19,6 @@ import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
 import { GetServerSidePropsContext } from "next";
-import { serverSideTranslations } from "next-i18next/serverSideTranslations";
 import { useRouter } from "next/router";
 import React, { useEffect, useRef, useState } from "react";
 import { FormattedNumber, IntlProvider } from "react-intl";
@@ -37,7 +36,6 @@ import {
 import { getSession } from "@lib/auth";
 import classNames from "@lib/classNames";
 import { HttpError } from "@lib/core/http/error";
-import { getOrSetUserLocaleFromHeaders } from "@lib/core/i18n/i18n.utils";
 import { useLocale } from "@lib/hooks/useLocale";
 import getIntegrations, { hasIntegration } from "@lib/integrations/getIntegrations";
 import { LocationType } from "@lib/location";
@@ -48,12 +46,12 @@ import prisma from "@lib/prisma";
 import { defaultAvatarSrc } from "@lib/profile";
 import { AdvancedOptions, EventTypeInput } from "@lib/types/event-type";
 import { inferSSRProps } from "@lib/types/inferSSRProps";
+import { WorkingHours } from "@lib/types/schedule";
 
 import { Dialog, DialogContent, DialogTrigger } from "@components/Dialog";
-import Modal from "@components/Modal";
 import Shell from "@components/Shell";
 import ConfirmationDialogContent from "@components/dialog/ConfirmationDialogContent";
-import CustomInputTypeForm from "@components/eventtype/CustomInputTypeForm";
+import CustomInputTypeForm from "@components/pages/eventtypes/CustomInputTypeForm";
 import Button from "@components/ui/Button";
 import { Scheduler } from "@components/ui/Scheduler";
 import Switch from "@components/ui/Switch";
@@ -66,33 +64,35 @@ import * as RadioArea from "@components/ui/form/radio-area";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-const PERIOD_TYPES = [
-  {
-    type: "rolling",
-    suffix: "into the future",
-  },
-  {
-    type: "range",
-    prefix: "Within a date range",
-  },
-  {
-    type: "unlimited",
-    prefix: "Indefinitely into the future",
-  },
-];
-
 const EventTypePage = (props: inferSSRProps<typeof getServerSideProps>) => {
+  const { t } = useLocale();
+  const PERIOD_TYPES = [
+    {
+      type: "rolling",
+      suffix: t("into_the_future"),
+    },
+    {
+      type: "range",
+      prefix: t("within_date_range"),
+    },
+    {
+      type: "unlimited",
+      prefix: t("indefinitely_into_future"),
+    },
+  ];
   const { eventType, locationOptions, availability, team, teamMembers, hasPaymentIntegration, currency } =
     props;
+  locationOptions.push(
+    { value: LocationType.InPerson, label: t("in_person_meeting") },
+    { value: LocationType.Phone, label: t("phone_call") }
+  );
 
-  const { t } = useLocale();
   const router = useRouter();
-  const [successModalOpen, setSuccessModalOpen] = useState(false);
 
   const updateMutation = useMutation(updateEventType, {
     onSuccess: async ({ eventType }) => {
       await router.push("/event-types");
-      showToast(`${eventType.title} event type updated successfully`, "success");
+      showToast(t("event_type_updated_successfully", { eventTypeTitle: eventType.title }), "success");
     },
     onError: (err: HttpError) => {
       const message = `${err.statusCode}: ${err.message}`;
@@ -103,7 +103,7 @@ const EventTypePage = (props: inferSSRProps<typeof getServerSideProps>) => {
   const deleteMutation = useMutation(deleteEventType, {
     onSuccess: async () => {
       await router.push("/event-types");
-      showToast("Event type deleted successfully", "success");
+      showToast(t("event_type_deleted_successfully"), "success");
     },
     onError: (err: HttpError) => {
       const message = `${err.statusCode}: ${err.message}`;
@@ -113,7 +113,10 @@ const EventTypePage = (props: inferSSRProps<typeof getServerSideProps>) => {
 
   const [users, setUsers] = useState<AdvancedOptions["users"]>([]);
   const [editIcon, setEditIcon] = useState(true);
-  const [enteredAvailability, setEnteredAvailability] = useState();
+  const [enteredAvailability, setEnteredAvailability] = useState<{
+    openingHours: WorkingHours[];
+    dateOverrides: WorkingHours[];
+  }>();
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [selectedTimeZone, setSelectedTimeZone] = useState("");
   const [selectedLocation, setSelectedLocation] = useState<OptionTypeBase | undefined>(undefined);
@@ -169,7 +172,6 @@ const EventTypePage = (props: inferSSRProps<typeof getServerSideProps>) => {
       advancedPayload.availability = enteredAvailability || undefined;
       advancedPayload.customInputs = customInputs;
       advancedPayload.timeZone = selectedTimeZone;
-      advancedPayload.hidden = hidden;
       advancedPayload.disableGuests = formData.disableGuests === "on";
       advancedPayload.requiresConfirmation = formData.requiresConfirmation === "on";
     }
@@ -180,6 +182,7 @@ const EventTypePage = (props: inferSSRProps<typeof getServerSideProps>) => {
       slug: asStringOrThrow(formData.slug),
       description: asStringOrThrow(formData.description),
       length: asNumberOrThrow(formData.length),
+      hidden,
       locations,
       ...advancedPayload,
       ...(team
@@ -208,10 +211,6 @@ const EventTypePage = (props: inferSSRProps<typeof getServerSideProps>) => {
   const closeLocationModal = () => {
     setSelectedLocation(undefined);
     setShowLocationModal(false);
-  };
-
-  const closeSuccessModal = () => {
-    setSuccessModalOpen(false);
   };
 
   const updateLocations = (e: React.FormEvent<HTMLFormElement>) => {
@@ -282,13 +281,13 @@ const EventTypePage = (props: inferSSRProps<typeof getServerSideProps>) => {
   const schedulingTypeOptions: { value: SchedulingType; label: string; description: string }[] = [
     {
       value: SchedulingType.COLLECTIVE,
-      label: "Collective",
-      description: "Schedule meetings when all selected team members are available.",
+      label: t("collective"),
+      description: t("collective_description"),
     },
     {
       value: SchedulingType.ROUND_ROBIN,
-      label: "Round Robin",
-      description: "Cycle meetings between multiple team members.",
+      label: t("round_robin"),
+      description: t("round_robin_description"),
     },
   ];
 
@@ -319,7 +318,7 @@ const EventTypePage = (props: inferSSRProps<typeof getServerSideProps>) => {
     <div>
       <Shell
         centered
-        title={`${eventType.title} | Event Type`}
+        title={t("event_type_title", { eventTypeTitle: eventType.title })}
         heading={
           <div className="relative -mb-2 group" onClick={() => setEditIcon(false)}>
             <input
@@ -329,7 +328,7 @@ const EventTypePage = (props: inferSSRProps<typeof getServerSideProps>) => {
               id="title"
               required
               className="w-full pl-0 text-xl font-bold text-gray-900 bg-transparent border-none cursor-pointer focus:text-black hover:text-gray-700 focus:ring-0 focus:outline-none"
-              placeholder="Quick Chat"
+              placeholder={t("quick_chat")}
               defaultValue={eventType.title}
             />
             {editIcon && (
@@ -499,7 +498,7 @@ const EventTypePage = (props: inferSSRProps<typeof getServerSideProps>) => {
                                           fillRule="evenodd"></path>
                                       </g>
                                     </svg>
-                                    <span className="ml-2 text-sm"> Daily.co Video</span>
+                                    <span className="ml-2 text-sm">Daily.co Video</span>
                                   </div>
                                 )}
                                 {location.type === LocationType.Zoom && (
@@ -662,20 +661,24 @@ const EventTypePage = (props: inferSSRProps<typeof getServerSideProps>) => {
                             </label>
                           </div>
                           <div className="w-full">
-                            <ul className="mt-1 w-max">
+                            <ul className="mt-1">
                               {customInputs.map((customInput: EventTypeCustomInput, idx: number) => (
                                 <li key={idx} className="p-2 mb-2 border bg-secondary-50">
                                   <div className="flex justify-between">
-                                    <div>
-                                      <div>
-                                        <span className="ml-2 text-sm">
+                                    <div className="flex-1 w-0">
+                                      <div className="truncate">
+                                        <span
+                                          className="ml-2 text-sm"
+                                          title={`${t("label")}: ${customInput.label}`}>
                                           {t("label")}: {customInput.label}
                                         </span>
                                       </div>
                                       {customInput.placeholder && (
-                                        <div>
-                                          <span className="ml-2 text-sm">
-                                            Placeholder: {customInput.placeholder}
+                                        <div className="truncate">
+                                          <span
+                                            className="ml-2 text-sm"
+                                            title={`${t("placeholder")}: ${customInput.placeholder}`}>
+                                            {t("placeholder")}: {customInput.placeholder}
                                           </span>
                                         </div>
                                       )}
@@ -686,7 +689,7 @@ const EventTypePage = (props: inferSSRProps<typeof getServerSideProps>) => {
                                       </div>
                                       <div>
                                         <span className="ml-2 text-sm">
-                                          {customInput.required ? "Required" : "Optional"}
+                                          {customInput.required ? t("required") : t("optional")}
                                         </span>
                                       </div>
                                     </div>
@@ -852,7 +855,11 @@ const EventTypePage = (props: inferSSRProps<typeof getServerSideProps>) => {
                               setAvailability={setEnteredAvailability}
                               setTimeZone={setSelectedTimeZone}
                               timeZone={selectedTimeZone}
-                              availability={availability}
+                              availability={availability.map((schedule) => ({
+                                ...schedule,
+                                startTime: new Date(schedule.startTime),
+                                endTime: new Date(schedule.endTime),
+                              }))}
                             />
                           </div>
                         </div>
@@ -950,12 +957,6 @@ const EventTypePage = (props: inferSSRProps<typeof getServerSideProps>) => {
                   <Button type="submit">{t("update")}</Button>
                 </div>
               </form>
-              <Modal
-                heading={t("event_type_updated_successfully")}
-                description={t("event_type_updated_successfully_description")}
-                open={successModalOpen}
-                handleClose={closeSuccessModal}
-              />
             </div>
           </div>
           <div className="w-full px-2 mt-8 ml-2 sm:w-3/12 sm:mt-0 min-w-32">
@@ -1067,33 +1068,33 @@ const EventTypePage = (props: inferSSRProps<typeof getServerSideProps>) => {
                     <p className="text-sm text-gray-400">{t("this_input_will_shown_booking_this_event")}</p>
                   </div>
                 </div>
-                <CustomInputTypeForm
-                  selectedCustomInput={selectedCustomInput}
-                  onSubmit={(values) => {
-                    const customInput: EventTypeCustomInput = {
-                      id: -1,
-                      eventTypeId: -1,
-                      label: values.label,
-                      placeholder: values.placeholder,
-                      required: values.required,
-                      type: values.type,
-                    };
-
-                    if (selectedCustomInput) {
-                      selectedCustomInput.label = customInput.label;
-                      selectedCustomInput.placeholder = customInput.placeholder;
-                      selectedCustomInput.required = customInput.required;
-                      selectedCustomInput.type = customInput.type;
-                    } else {
-                      setCustomInputs(customInputs.concat(customInput));
-                    }
-                    setSelectedCustomInputModalOpen(false);
-                  }}
-                  onCancel={() => {
-                    setSelectedCustomInputModalOpen(false);
-                  }}
-                />
               </div>
+              <CustomInputTypeForm
+                selectedCustomInput={selectedCustomInput}
+                onSubmit={(values) => {
+                  const customInput: EventTypeCustomInput = {
+                    id: -1,
+                    eventTypeId: -1,
+                    label: values.label,
+                    placeholder: values.placeholder,
+                    required: values.required,
+                    type: values.type,
+                  };
+
+                  if (selectedCustomInput) {
+                    selectedCustomInput.label = customInput.label;
+                    selectedCustomInput.placeholder = customInput.placeholder;
+                    selectedCustomInput.required = customInput.required;
+                    selectedCustomInput.type = customInput.type;
+                  } else {
+                    setCustomInputs(customInputs.concat(customInput));
+                  }
+                  setSelectedCustomInputModalOpen(false);
+                }}
+                onCancel={() => {
+                  setSelectedCustomInputModalOpen(false);
+                }}
+              />
             </div>
           </DialogContent>
         </Dialog>
@@ -1105,8 +1106,6 @@ const EventTypePage = (props: inferSSRProps<typeof getServerSideProps>) => {
 export const getServerSideProps = async (context: GetServerSidePropsContext) => {
   const { req, query } = context;
   const session = await getSession({ req });
-  const locale = await getOrSetUserLocaleFromHeaders(context.req);
-
   const typeParam = parseInt(asStringOrThrow(query.type));
 
   if (!session?.user?.id) {
@@ -1240,11 +1239,7 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
 
   const integrations = getIntegrations(credentials);
 
-  const locationOptions: OptionTypeBase[] = [
-    { value: LocationType.InPerson, label: "Link or In-person meeting" },
-    { value: LocationType.Phone, label: "Phone call" },
-    { value: LocationType.Zoom, label: "Zoom Video", disabled: true },
-  ];
+  const locationOptions: OptionTypeBase[] = [];
 
   if (hasIntegration(integrations, "zoom_video")) {
     locationOptions.push({ value: LocationType.Zoom, label: "Zoom Video", disabled: true });
@@ -1253,8 +1248,7 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
   if (hasIntegration(integrations, "google_calendar")) {
     locationOptions.push({ value: LocationType.GoogleMeet, label: "Google Meet" });
   }
-  const hasDailyIntegration = process.env.DAILY_API_KEY;
-  if (hasDailyIntegration) {
+  if (hasIntegration(integrations, "daily_video")) {
     locationOptions.push({ value: LocationType.Daily, label: "Daily.co Video" });
   }
   const currency =
@@ -1267,7 +1261,14 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
   }
 
   type Availability = typeof eventType["availability"];
-  const getAvailability = (availability: Availability) => (availability?.length ? availability : null);
+  const getAvailability = (availability: Availability) =>
+    availability?.length
+      ? availability.map((schedule) => ({
+          ...schedule,
+          startTime: new Date(new Date().toDateString() + " " + schedule.startTime.toTimeString()).valueOf(),
+          endTime: new Date(new Date().toDateString() + " " + schedule.endTime.toTimeString()).valueOf(),
+        }))
+      : null;
 
   const availability = getAvailability(eventType.availability) || [];
   availability.sort((a, b) => a.startTime - b.startTime);
@@ -1275,6 +1276,7 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
   const eventTypeObject = Object.assign({}, eventType, {
     periodStartDate: eventType.periodStartDate?.toString() ?? null,
     periodEndDate: eventType.periodEndDate?.toString() ?? null,
+    availability,
   });
 
   const teamMembers = eventTypeObject.team
@@ -1288,7 +1290,6 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
   return {
     props: {
       session,
-      localeProp: locale,
       eventType: eventTypeObject,
       locationOptions,
       availability,
@@ -1296,7 +1297,6 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
       teamMembers,
       hasPaymentIntegration,
       currency,
-      ...(await serverSideTranslations(locale, ["common"])),
     },
   };
 };

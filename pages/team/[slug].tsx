@@ -1,11 +1,9 @@
 import { ArrowRightIcon } from "@heroicons/react/solid";
 import { Prisma } from "@prisma/client";
 import { GetServerSidePropsContext } from "next";
-import { serverSideTranslations } from "next-i18next/serverSideTranslations";
 import Link from "next/link";
 import React from "react";
 
-import { getOrSetUserLocaleFromHeaders } from "@lib/core/i18n/i18n.utils";
 import { useLocale } from "@lib/hooks/useLocale";
 import useTheme from "@lib/hooks/useTheme";
 import { useToggleQuery } from "@lib/hooks/useToggleQuery";
@@ -31,7 +29,7 @@ function TeamPage({ team }: inferSSRProps<typeof getServerSideProps>) {
       {team.eventTypes.map((type) => (
         <li
           key={type.id}
-          className="group relative dark:bg-neutral-900 dark:border-0 dark:hover:border-neutral-600 bg-white hover:bg-gray-50 border border-neutral-200 hover:border-black rounded-sm">
+          className="group relative dark:bg-neutral-900 dark:border-0 dark:hover:border-neutral-600 bg-white hover:bg-gray-50 border border-neutral-200 hover:border-brand rounded-sm">
           <ArrowRightIcon className="absolute transition-opacity h-4 w-4 right-3 top-3 text-black dark:text-white opacity-0 group-hover:opacity-100" />
           <Link href={`${team.slug}/${type.slug}`}>
             <a className="px-6 py-4 flex justify-between">
@@ -78,7 +76,7 @@ function TeamPage({ team }: inferSSRProps<typeof getServerSideProps>) {
                   <div className="w-full border-t border-gray-200 dark:border-gray-900" />
                 </div>
                 <div className="relative flex justify-center">
-                  <span className="px-2 bg-gray-100 text-sm text-gray-500 dark:bg-black dark:text-gray-500">
+                  <span className="px-2 bg-gray-100 text-sm text-gray-500 dark:bg-brand dark:text-gray-500">
                     {t("or")}
                   </span>
                 </div>
@@ -102,7 +100,6 @@ function TeamPage({ team }: inferSSRProps<typeof getServerSideProps>) {
 }
 
 export const getServerSideProps = async (context: GetServerSidePropsContext) => {
-  const locale = await getOrSetUserLocaleFromHeaders(context.req);
   const slug = Array.isArray(context.query?.slug) ? context.query.slug.pop() : context.query.slug;
 
   const userSelect = Prisma.validator<Prisma.UserSelect>()({
@@ -165,9 +162,7 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
 
   return {
     props: {
-      localeProp: locale,
       team,
-      ...(await serverSideTranslations(locale, ["common"])),
     },
   };
 };
