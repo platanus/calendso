@@ -30,6 +30,7 @@
   <img src="https://img.shields.io/github/package-json/v/calendso/calendso">
   <a href="https://github.com/calendso/calendso/pulse"><img src="https://img.shields.io/github/commit-activity/m/calendso/calendso" alt="Commits-per-month"></a>
   <a href="https://cal.com/pricing"><img src="https://img.shields.io/badge/Pricing-%2412%2Fmonth-brightgreen" alt="Pricing"></a>  
+  <a href="https://cal.crowdin.com/Cal"><img src="https://badges.crowdin.net/e/5a55420475b48696779e30e0208a1899/localized.svg" alt="Translate Slack"></a>
 </p>
 
 <!-- ABOUT THE PROJECT -->
@@ -216,8 +217,11 @@ yarn test-playwright
 ### Docker
 
 The Docker configuration for Cal is an effort powered by people within the community. Cal.com, Inc. does not provide official support for Docker, but we will accept fixes and documentation. Use at your own risk.
+  
+If you want to contribute to the Docker repository, [reply here](https://github.com/calendso/docker/discussions/32).
 
 The Docker configuration can be found [in our docker repository](https://github.com/calendso/docker).
+  
 
 ### Railway
 
@@ -250,7 +254,7 @@ Contributions are what make the open source community such an amazing place to b
 2. In the search box, type calendar and select the Google Calendar API search result.
 3. Enable the selected API.
 4. Next, go to the [OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent) from the side pane. Select the app type (Internal or External) and enter the basic app details on the first page.
-5. In the second page on Scopes, select Add or Remove Scopes. Search for Calendar.event and select the scope with scope value `.../auth/calendar.events`, `.../auth/calendar.readonly`, `.../auth/calendar` and select Update.
+5. In the second page on Scopes, select Add or Remove Scopes. Search for Calendar.event and select the scope with scope value `.../auth/calendar.events`, `.../auth/calendar.readonly` and select Update.
 6. In the third page (Test Users), add the Google account(s) you'll using. Make sure the details are correct on the last page of the wizard and your consent screen will be configured.
 7. Now select [Credentials](https://console.cloud.google.com/apis/credentials) from the side pane and then select Create Credentials. Select the OAuth Client ID option.
 8. Select Web Application as the Application Type.
@@ -289,6 +293,7 @@ Contributions are what make the open source community such an amazing place to b
  2. From within your dashboard, go to the [developers](https://dashboard.daily.co/developers) tab.
  3. Copy your API key.
  4. Now paste the API key to your .env file into the `DAILY_API_KEY` field in your .env file.
+ 5. If you have a [Daily Scale Plan](https://www.daily.co/pricing)  can also enable the ability to record Daily video meetings. To do so, set the `DAILY_SCALE_PLAN` environment variable to `'true'` 
 
 <!-- LICENSE -->
 

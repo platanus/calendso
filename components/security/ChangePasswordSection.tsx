@@ -2,13 +2,11 @@ import React, { SyntheticEvent, useState } from "react";
 
 import { ErrorCode } from "@lib/auth";
 import { useLocale } from "@lib/hooks/useLocale";
-
-import Modal from "@components/Modal";
+import showToast from "@lib/notification";
 
 const ChangePasswordSection = () => {
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [successModalOpen, setSuccessModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { t } = useLocale();
@@ -16,10 +14,6 @@ const ChangePasswordSection = () => {
   const errorMessages: { [key: string]: string } = {
     [ErrorCode.IncorrectPassword]: t("current_incorrect_password"),
     [ErrorCode.NewPasswordMatchesOld]: t("new_password_matches_old_password"),
-  };
-
-  const closeSuccessModal = () => {
-    setSuccessModalOpen(false);
   };
 
   async function changePasswordHandler(e: SyntheticEvent) {
@@ -44,7 +38,7 @@ const ChangePasswordSection = () => {
       if (response.status === 200) {
         setOldPassword("");
         setNewPassword("");
-        setSuccessModalOpen(true);
+        showToast(t("password_has_been_changed"), "success");
         return;
       }
 
@@ -78,7 +72,7 @@ const ChangePasswordSection = () => {
                   name="current_password"
                   id="current_password"
                   required
-                  className="shadow-sm focus:ring-black focus:border-black block w-full sm:text-sm border-gray-300 rounded-sm"
+                  className="shadow-sm focus:ring-black focus:border-brand block w-full sm:text-sm border-gray-300 rounded-sm"
                   placeholder={t("your_old_password")}
                 />
               </div>
@@ -95,7 +89,7 @@ const ChangePasswordSection = () => {
                   value={newPassword}
                   required
                   onInput={(e) => setNewPassword(e.currentTarget.value)}
-                  className="shadow-sm focus:ring-black focus:border-black block w-full sm:text-sm border-gray-300 rounded-sm"
+                  className="shadow-sm focus:ring-black focus:border-brand block w-full sm:text-sm border-gray-300 rounded-sm"
                   placeholder={t("super_secure_new_password")}
                 />
               </div>
@@ -112,12 +106,6 @@ const ChangePasswordSection = () => {
           <hr className="mt-4" />
         </div>
       </form>
-      <Modal
-        heading={t("password_updated_successfully")}
-        description={t("password_has_been_changed")}
-        open={successModalOpen}
-        handleClose={closeSuccessModal}
-      />
     </>
   );
 };

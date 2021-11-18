@@ -1,8 +1,7 @@
 import { GetServerSidePropsContext } from "next";
-import { serverSideTranslations } from "next-i18next/serverSideTranslations";
 
 import { asStringOrNull } from "@lib/asStringOrNull";
-import { getOrSetUserLocaleFromHeaders } from "@lib/core/i18n/i18n.utils";
+import { getWorkingHours } from "@lib/availability";
 import prisma from "@lib/prisma";
 import { inferSSRProps } from "@lib/types/inferSSRProps";
 
@@ -15,7 +14,6 @@ export default function TeamType(props: AvailabilityTeamPageProps) {
 }
 
 export const getServerSideProps = async (context: GetServerSidePropsContext) => {
-  const locale = await getOrSetUserLocaleFromHeaders(context.req);
   const slugParam = asStringOrNull(context.query.slug);
   const typeParam = asStringOrNull(context.query.type);
   const dateParam = asStringOrNull(context.query.date);
@@ -46,6 +44,8 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
               avatar: true,
               username: true,
               timeZone: true,
+              hideBranding: true,
+              plan: true,
             },
           },
           title: true,
@@ -53,8 +53,15 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
           description: true,
           length: true,
           schedulingType: true,
+          periodType: true,
           periodStartDate: true,
           periodEndDate: true,
+          periodDays: true,
+          periodCountCalendarDays: true,
+          minimumBookingNotice: true,
+          price: true,
+          currency: true,
+          timeZone: true,
         },
       },
     },
@@ -68,30 +75,32 @@ export const getServerSideProps = async (context: GetServerSidePropsContext) => 
 
   const [eventType] = team.eventTypes;
 
-  type Availability = typeof eventType["availability"];
-  const getWorkingHours = (availability: Availability) => (availability?.length ? availability : null);
-  const workingHours = getWorkingHours(eventType.availability) || [];
-
-  workingHours.sort((a, b) => a.startTime - b.startTime);
+  const workingHours = getWorkingHours(
+    {
+      timeZone: eventType.timeZone || undefined,
+    },
+    eventType.availability
+  );
 
   const eventTypeObject = Object.assign({}, eventType, {
     periodStartDate: eventType.periodStartDate?.toString() ?? null,
     periodEndDate: eventType.periodEndDate?.toString() ?? null,
   });
 
+  eventTypeObject.availability = [];
+
   return {
     props: {
-      localeProp: locale,
       profile: {
         name: team.name,
         slug: team.slug,
-        image: team.logo || null,
+        image: team.logo,
         theme: null,
+        weekStart: "Sunday",
       },
       date: dateParam,
       eventType: eventTypeObject,
       workingHours,
-      ...(await serverSideTranslations(locale, ["common"])),
     },
   };
 };
